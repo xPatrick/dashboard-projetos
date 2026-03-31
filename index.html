@@ -2,111 +2,162 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sistema com Dashboard + Gráficos</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<title>Sistema com Supabase</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
-body{font-size:12px}
-.card{background:#fff;border-radius:8px;padding:10px;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+body{font-family:Arial;background:#f3f4f6;padding:20px}
+input,button{padding:6px;margin:3px}
+.card{background:#fff;padding:10px;border-radius:8px;margin:5px}
+.negativo{background:#fecaca}
+.alerta{background:#fef9c3}
 </style>
 </head>
-<body class="bg-gray-100 p-4">
 
-<h1 class="text-xl font-bold text-center mb-4">Dashboard com Gráficos</h1>
+<body>
 
-<!-- DASHBOARD -->
-<div class="grid grid-cols-4 gap-3 mb-4">
-<div class="card"><div>Total Projetos</div><div id="d_totalProj" class="text-lg font-bold"></div></div>
-<div class="card"><div>Valor Total</div><div id="d_totalValor" class="text-lg font-bold"></div></div>
-<div class="card"><div>Total Executado</div><div id="d_totalExec" class="text-lg font-bold"></div></div>
-<div class="card"><div>% Execução</div><div id="d_percent" class="text-lg font-bold"></div></div>
-</div>
+<h2>Login</h2>
+<input id="email" placeholder="email">
+<input id="senha" type="password" placeholder="senha">
+<button onclick="login()">Entrar</button>
 
-<!-- BOTÃO EXIBIR GRÁFICOS -->
-<div class="text-center mb-4">
-<button onclick="toggleGraficos()" class="bg-indigo-600 text-white px-4 py-2">Mostrar / Ocultar Gráficos</button>
-</div>
+<hr>
 
-<!-- GRÁFICOS -->
-<div id="areaGraficos" class="hidden grid grid-cols-2 gap-4 mb-4">
-  <canvas id="graficoBarra"></canvas>
-  <canvas id="graficoPizza"></canvas>
-</div>
+<h2>Cadastro de Projeto</h2>
+
+<input id="projeto" placeholder="Projeto">
+<input id="proponente" placeholder="Proponente">
+<input id="valor" placeholder="Valor">
+<button onclick="salvarProjeto()">Salvar</button>
+
+<hr>
+
+<h2>Dashboard</h2>
+
+<div class="card">Total Projetos: <span id="totalProj"></span></div>
+<div class="card">Valor Total: <span id="totalValor"></span></div>
+<div class="card">Executado: <span id="totalExec"></span></div>
+
+<canvas id="graficoBar"></canvas>
+<canvas id="graficoPie"></canvas>
+
+<hr>
+
+<h2>Lista</h2>
+<div id="lista"></div>
 
 <script>
-(function(){
-'use strict';
 
-let dados = JSON.parse(localStorage.getItem('dados') || '[]');
-let dadosFiltrados = [...dados];
-let chartBar, chartPie;
+// 🔐 CONFIG
+const SUPABASE_URL = 'https://tanbwsudetozpwkmmbxy.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_AwgTyNI9gMQ-VAj7RTpSYw_0CQbLuhx';
 
-function parseValor(v){return Number((v||'').replace(/[^\d,]/g,'').replace(',','.'))||0}
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-function atualizarDashboard(){
-let totalProj = dadosFiltrados.length;
-let totalValor = 0;
-let totalExec = 0;
+// 🔐 LOGIN
+async function login(){
+ const { error } = await client.auth.signInWithPassword({
+   email: document.getElementById('email').value,
+   password: document.getElementById('senha').value
+ });
 
-dadosFiltrados.forEach(d=>{
- totalValor += parseValor(d.valor);
- (d.parcelas||[]).forEach(p=> totalExec += parseValor(p.v));
-});
-
-let percent = totalValor ? ((totalExec/totalValor)*100).toFixed(1) : 0;
-
-// atualizar cards
- document.getElementById('d_totalProj').textContent = totalProj;
- document.getElementById('d_totalValor').textContent = totalValor.toFixed(2);
- document.getElementById('d_totalExec').textContent = totalExec.toFixed(2);
- document.getElementById('d_percent').textContent = percent + '%';
-
-renderGraficos(totalValor, totalExec);
-}
-
-function renderGraficos(totalValor, totalExec){
-let saldo = totalValor - totalExec;
-
-// DESTROI gráficos anteriores (evita bug)
-if(chartBar) chartBar.destroy();
-if(chartPie) chartPie.destroy();
-
-// GRÁFICO DE BARRA
-chartBar = new Chart(document.getElementById('graficoBarra'),{
- type:'bar',
- data:{
-  labels:['Total','Executado','Saldo'],
-  datasets:[{
-    label:'Valores',
-    data:[totalValor,totalExec,saldo]
-  }]
+ if(error) alert(error.message);
+ else{
+   alert('Logado!');
+   carregar();
  }
-});
-
-// GRÁFICO DE PIZZA
-chartPie = new Chart(document.getElementById('graficoPizza'),{
- type:'pie',
- data:{
-  labels:['Executado','Saldo'],
-  datasets:[{
-    data:[totalExec,saldo]
-  }]
- }
-});
 }
 
-window.toggleGraficos = function(){
-const el = document.getElementById('areaGraficos');
-el.classList.toggle('hidden');
-atualizarDashboard();
+// 💾 SALVAR PROJETO
+async function salvarProjeto(){
+ await client.from('projetos').insert([{
+   projeto: projeto.value,
+   proponente: proponente.value,
+   valor: parseFloat(valor.value)
+ }]);
+
+ carregar();
 }
 
-// inicial
-atualizarDashboard();
+// 📥 CARREGAR DADOS
+async function carregar(){
 
-})();
+ const { data: projetos } = await client.from('projetos').select('*');
+ const { data: parcelas } = await client.from('parcelas').select('*');
+
+ let totalValor = 0;
+ let totalExec = 0;
+
+ document.getElementById('lista').innerHTML = '';
+
+ projetos.forEach(p => {
+
+   let exec = 0;
+
+   parcelas
+     .filter(x=>x.projeto_id===p.id)
+     .forEach(parc=>{
+       exec += parc.valor;
+       totalExec += parc.valor;
+     });
+
+   totalValor += p.valor;
+
+   let saldo = p.valor - exec;
+
+   let div = document.createElement('div');
+   div.className='card';
+
+   if(saldo < 0) div.classList.add('negativo');
+   else if(saldo < p.valor*0.2) div.classList.add('alerta');
+
+   div.innerHTML = `
+     <b>${p.projeto}</b><br>
+     Valor: ${p.valor}<br>
+     Executado: ${exec}<br>
+     Saldo: ${saldo}
+   `;
+
+   document.getElementById('lista').appendChild(div);
+
+ });
+
+ document.getElementById('totalProj').innerText = projetos.length;
+ document.getElementById('totalValor').innerText = totalValor.toFixed(2);
+ document.getElementById('totalExec').innerText = totalExec.toFixed(2);
+
+ gerarGraficos(totalValor, totalExec);
+}
+
+// 📊 GRÁFICOS
+let bar,pie;
+
+function gerarGraficos(total, exec){
+
+ if(bar) bar.destroy();
+ if(pie) pie.destroy();
+
+ let saldo = total - exec;
+
+ bar = new Chart(document.getElementById('graficoBar'),{
+   type:'bar',
+   data:{
+     labels:['Total','Executado','Saldo'],
+     datasets:[{data:[total,exec,saldo]}]
+   }
+ });
+
+ pie = new Chart(document.getElementById('graficoPie'),{
+   type:'pie',
+   data:{
+     labels:['Executado','Saldo'],
+     datasets:[{data:[exec,saldo]}]
+   }
+ });
+}
+
 </script>
 
 </body>
