@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Sistema com Gestão de Usuários</title>
+<title>Sistema Completo FINAL</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -10,10 +10,11 @@
 <style>
 body{font-family:Arial;background:#f3f4f6;padding:20px}
 input,select,button{padding:6px;margin:3px}
-.card{background:#fff;padding:10px;border-radius:8px;margin:5px}
 .table{width:100%;background:#fff;border-collapse:collapse}
 .table td,.table th{border:1px solid #ddd;padding:6px;text-align:center}
-.hidden{display:none}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
+.modal.show{display:flex}
+.box{background:#fff;padding:20px;border-radius:8px;width:900px;max-height:90vh;overflow:auto}
 </style>
 </head>
 
@@ -26,39 +27,72 @@ input,select,button{padding:6px;margin:3px}
 
 <hr>
 
-<h2 id="tituloAdmin" class="hidden">Gestão de Usuários</h2>
-<table id="tabelaUsuarios" class="table hidden">
-<thead>
-<tr><th>Email</th><th>Perfil</th><th>Ação</th></tr>
-</thead>
-<tbody id="listaUsuarios"></tbody>
-</table>
+<h2>Cadastro Completo</h2>
+<input id="edital" placeholder="EDITAL">
+<input id="sei_exec" placeholder="SEI - EXECUÇÃO">
+<input id="sei_pc" placeholder="SEI - PRESTAÇÃO">
+<input id="proposta" placeholder="N° PROPOSTA">
+<input id="projeto" placeholder="PROJETO">
+<input id="proponente" placeholder="PROPONENTE">
+<input type="date" id="vig_ini">
+<input type="date" id="vig_fim">
+<select id="situacao">
+<option>Ativo</option>
+<option>Pendente</option>
+<option>Finalizado</option>
+</select>
+<textarea id="obs" placeholder="OBSERVAÇÕES"></textarea>
+<button onclick="salvarProjeto()">Salvar</button>
 
 <hr>
 
 <h2>Projetos</h2>
-<div id="conteudo"></div>
+<table class="table">
+<thead>
+<tr>
+<th>ID</th><th>EDITAL</th><th>EXEC</th><th>PC</th><th>PROPOSTA</th>
+<th>PROJETO</th><th>PROPONENTE</th><th>VIG INI</th><th>VIG FIM</th>
+<th>SITUAÇÃO</th><th>OBS</th><th>AÇÕES</th>
+</tr>
+</thead>
+<tbody id="tabela"></tbody>
+</table>
+
+<!-- MODAL PARCELAS -->
+<div id="modal" class="modal">
+<div class="box">
+<h3>Parcelas</h3>
+
+<label>VALOR</label><input id="p_valor">
+<label>DATA PC</label><input type="date" id="p_data">
+<label>TÉCNICO</label><input id="p_tecnico">
+<label>ANALISTA</label><input id="p_analista">
+
+<button onclick="salvarParcela()">Salvar Parcela</button>
+
+<table class="table">
+<thead>
+<tr>
+<th>PARCELA</th><th>VALOR</th><th>DATA</th><th>TÉCNICO</th><th>ANALISTA</th><th>AÇÕES</th>
+</tr>
+</thead>
+<tbody id="listaParcelas"></tbody>
+</table>
+
+<button onclick="fecharModal()">Fechar</button>
+</div>
+</div>
 
 <script>
+const SUPABASE_URL='SUA_URL';
+const SUPABASE_KEY='SUA_ANON_KEY';
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
-const SUPABASE_URL = 'SUA_URL';
-const SUPABASE_KEY = 'SUA_ANON_KEY';
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let projetoAtual=null;
+let parcelaEditId=null;
 
-let currentUser = null;
-let currentRole = 'user';
-
-// LOGIN
 async function login(){
- const { data, error } = await db.auth.signInWithPassword({
-  email: email.value,
-  password: senha.value
- });
-
- if(error){ alert(error.message); return; }
-
- currentUser = data.user;
- await carregarPerfil();
+ await db.auth.signInWithPassword({email:email.value,password:senha.value});
  carregar();
 }
 
@@ -67,58 +101,99 @@ async function logout(){
  location.reload();
 }
 
-// PERFIL
-async function carregarPerfil(){
- const { data } = await db
-  .from('perfis')
-  .select('role')
-  .eq('id', currentUser.id)
-  .single();
-
- currentRole = data?.role || 'user';
-
- if(currentRole === 'admin'){
-  document.getElementById('tituloAdmin').classList.remove('hidden');
-  document.getElementById('tabelaUsuarios').classList.remove('hidden');
-  carregarUsuarios();
- }
+async function salvarProjeto(){
+ await db.from('projetos').insert([{
+ edital:edital.value,
+ sei_exec:sei_exec.value,
+ sei_pc:sei_pc.value,
+ proposta:proposta.value,
+ projeto:projeto.value,
+ proponente:proponente.value,
+ vig_ini:vig_ini.value,
+ vig_fim:vig_fim.value,
+ situacao:situacao.value,
+ observacoes:obs.value
+ }]);
+ carregar();
 }
 
-// LISTAR USUÁRIOS (ADMIN)
-async function carregarUsuarios(){
-
- const { data: perfis } = await db.from('perfis').select('*');
- const { data: users } = await db.auth.admin.listUsers();
-
- listaUsuarios.innerHTML='';
-
- users.users.forEach(u=>{
-  const perfil = perfis.find(p=>p.id === u.id);
-
-  let tr = document.createElement('tr');
-
-  tr.innerHTML = `
-    <td>${u.email}</td>
-    <td>${perfil?.role || 'user'}</td>
-    <td>
-      <button onclick="alterarRole('${u.id}','admin')">Admin</button>
-      <button onclick="alterarRole('${u.id}','user')">User</button>
-    </td>`;
-
-  listaUsuarios.appendChild(tr);
+async function carregar(){
+ const {data}=await db.from('projetos').select('*');
+ tabela.innerHTML='';
+ data.forEach(p=>{
+ let tr=document.createElement('tr');
+ tr.innerHTML=`
+ <td>${p.id}</td>
+ <td>${p.edital}</td>
+ <td>${p.sei_exec}</td>
+ <td>${p.sei_pc}</td>
+ <td>${p.proposta}</td>
+ <td>${p.projeto}</td>
+ <td>${p.proponente}</td>
+ <td>${p.vig_ini}</td>
+ <td>${p.vig_fim}</td>
+ <td>${p.situacao}</td>
+ <td>${p.observacoes}</td>
+ <td><button onclick="abrirParcelas(${p.id})">Parcelas</button></td>`;
+ tabela.appendChild(tr);
  });
 }
 
-// ALTERAR PERFIL
-async function alterarRole(userId, role){
- await db.from('perfis').update({ role }).eq('id', userId);
- carregarUsuarios();
+function abrirParcelas(id){
+ projetoAtual=id;
+ modal.classList.add('show');
+ carregarParcelas();
 }
 
-// CARREGAR DADOS
-async function carregar(){
- const { data } = await db.from('projetos').select('*');
- conteudo.innerHTML = JSON.stringify(data);
+function fecharModal(){modal.classList.remove('show');}
+
+async function salvarParcela(){
+ const {data}=await db.from('parcelas').select('*').eq('projeto_id',projetoAtual);
+ let numero=data.length+1;
+ if(parcelaEditId){
+ await db.from('parcelas').update({valor:p_valor.value,data_pc:p_data.value,tecnico:p_tecnico.value,analista:p_analista.value}).eq('id',parcelaEditId);
+ parcelaEditId=null;
+ }else{
+ await db.from('parcelas').insert([{projeto_id:projetoAtual,numero,valor:p_valor.value,data_pc:p_data.value,tecnico:p_tecnico.value,analista:p_analista.value}]);
+ }
+ limpar();
+ carregarParcelas();
+}
+
+async function carregarParcelas(){
+ const {data}=await db.from('parcelas').select('*').eq('projeto_id',projetoAtual).order('numero');
+ listaParcelas.innerHTML='';
+ data.forEach(p=>{
+ let tr=document.createElement('tr');
+ tr.innerHTML=`
+ <td>${p.numero}</td>
+ <td>${p.valor}</td>
+ <td>${p.data_pc}</td>
+ <td>${p.tecnico}</td>
+ <td>${p.analista}</td>
+ <td>
+ <button onclick="editarParcela(${p.id},'${p.valor}','${p.data_pc}','${p.tecnico}','${p.analista}')">✏️</button>
+ <button onclick="excluirParcela(${p.id})">🗑️</button>
+ </td>`;
+ listaParcelas.appendChild(tr);
+ });
+}
+
+function editarParcela(id,v,d,t,a){
+ parcelaEditId=id;
+ p_valor.value=v;
+ p_data.value=d;
+ p_tecnico.value=t;
+ p_analista.value=a;
+}
+
+async function excluirParcela(id){
+ await db.from('parcelas').delete().eq('id',id);
+ carregarParcelas();
+}
+
+function limpar(){
+ p_valor.value='';p_data.value='';p_tecnico.value='';p_analista.value='';
 }
 
 </script>
