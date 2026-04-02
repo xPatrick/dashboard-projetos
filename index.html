@@ -1,201 +1,254 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>Sistema Completo FINAL</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestão de Projetos e Parcelas</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<style>
-body{font-family:Arial;background:#f3f4f6;padding:20px}
-input,select,button{padding:6px;margin:3px}
-.table{width:100%;background:#fff;border-collapse:collapse}
-.table td,.table th{border:1px solid #ddd;padding:6px;text-align:center}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
-.modal.show{display:flex}
-.box{background:#fff;padding:20px;border-radius:8px;width:900px;max-height:90vh;overflow:auto}
-</style>
+    <style>
+        :root { --primary: #2563eb; --secondary: #64748b; --bg: #f8fafc; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #1e293b; }
+        h2, h3 { color: var(--primary); border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+        
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        
+        .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        input, select, textarea, button { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
+        
+        button { cursor: pointer; transition: 0.2s; font-weight: bold; }
+        .btn-main { background: var(--primary); color: white; border: none; }
+        .btn-main:hover { background: #1d4ed8; }
+        .btn-out { background: #ef4444; color: white; border: none; }
+
+        .table-res { overflow-x: auto; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; background: white; font-size: 14px; }
+        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f1f5f9; color: var(--secondary); }
+        tr:hover { background: #f8fafc; }
+
+        /* Modal Estilizado */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 100; }
+        .modal.show { display: flex; }
+        .box { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; }
+        
+        #canvasContainer { margin: 20px 0; height: 300px; }
+    </style>
 </head>
-
 <body>
 
-<h2>Login</h2>
-<input id="email"><input id="senha" type="password">
-<button onclick="login()">Entrar</button>
-<button onclick="logout()">Sair</button>
+<div class="container">
+    <header style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Gestão de Projetos</h2>
+        <div>
+            <input id="email" placeholder="Email">
+            <input id="senha" type="password" placeholder="Senha">
+            <button class="btn-main" onclick="login()">Entrar</button>
+            <button onclick="logout()">Sair</button>
+        </div>
+    </header>
 
-<hr>
+    <hr>
 
-<h2>Cadastro Completo</h2>
-<input id="edital" placeholder="EDITAL">
-<input id="sei_exec" placeholder="SEI - EXECUÇÃO">
-<input id="sei_pc" placeholder="SEI - PRESTAÇÃO">
-<input id="proposta" placeholder="N° PROPOSTA">
-<input id="projeto" placeholder="PROJETO">
-<input id="proponente" placeholder="PROPONENTE">
-<input type="date" id="vig_ini">
-<input type="date" id="vig_fim">
-<select id="situacao">
-<option>Ativo</option>
-<option>Pendente</option>
-<option>Finalizado</option>
-</select>
-<textarea id="obs" placeholder="OBSERVAÇÕES"></textarea>
-<button onclick="salvarProjeto()">Salvar</button>
+    <h3>Novo Cadastro</h3>
+    <div class="grid-form">
+        <input id="edital" placeholder="Edital">
+        <input id="sei_exec" placeholder="SEI Execução">
+        <input id="sei_pc" placeholder="SEI Prestação">
+        <input id="proposta" placeholder="Nº Proposta">
+        <input id="projeto" placeholder="Nome do Projeto">
+        <input id="proponente" placeholder="Proponente">
+        <input type="date" id="vig_ini" title="Vigência Início">
+        <input type="date" id="vig_fim" title="Vigência Fim">
+        <select id="situacao">
+            <option>Ativo</option>
+            <option>Pendente</option>
+            <option>Finalizado</option>
+        </select>
+    </div>
+    <textarea id="obs" style="width: 100%; margin-bottom: 10px;" placeholder="Observações Gerais"></textarea>
+    <button class="btn-main" onclick="salvarProjeto()">Salvar Projeto</button>
 
-<hr>
-
-<h2>Projetos</h2>
-<table class="table">
-<thead>
-<tr>
-<th>ID</th><th>EDITAL</th><th>EXEC</th><th>PC</th><th>PROPOSTA</th>
-<th>PROJETO</th><th>PROPONENTE</th><th>VIG INI</th><th>VIG FIM</th>
-<th>SITUAÇÃO</th><th>OBS</th><th>AÇÕES</th>
-</tr>
-</thead>
-<tbody id="tabela"></tbody>
-</table>
-
-<!-- MODAL PARCELAS -->
-<div id="modal" class="modal">
-<div class="box">
-<h3>Parcelas</h3>
-
-<label>VALOR</label><input id="p_valor">
-<label>DATA PC</label><input type="date" id="p_data">
-<label>TÉCNICO</label><input id="p_tecnico">
-<label>ANALISTA</label><input id="p_analista">
-
-<button onclick="salvarParcela()">Salvar Parcela</button>
-
-<table class="table">
-<thead>
-<tr>
-<th>PARCELA</th><th>VALOR</th><th>DATA</th><th>TÉCNICO</th><th>ANALISTA</th><th>AÇÕES</th>
-</tr>
-</thead>
-<tbody id="listaParcelas"></tbody>
-</table>
-
-<button onclick="fecharModal()">Fechar</button>
+    <div class="table-res">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th><th>PROJETO</th><th>PROPONENTE</th><th>VIGÊNCIA</th><th>SITUAÇÃO</th><th>AÇÕES</th>
+                </tr>
+            </thead>
+            <tbody id="tabela"></tbody>
+        </table>
+    </div>
 </div>
+
+<div id="modal" class="modal">
+    <div class="box">
+        <div style="display: flex; justify-content: space-between;">
+            <h3>Detalhamento Financeiro (Parcelas)</h3>
+            <button class="btn-out" onclick="fecharModal()">X</button>
+        </div>
+
+        <div class="grid-form">
+            <input type="number" id="p_valor" placeholder="Valor R$">
+            <input type="date" id="p_data" title="Data PC">
+            <input id="p_tecnico" placeholder="Técnico Responsável">
+            <input id="p_analista" placeholder="Analista Responsável">
+            <button class="btn-main" onclick="salvarParcela()">Adicionar/Atualizar</button>
+        </div>
+
+        <div id="canvasContainer">
+            <canvas id="graficoParcelas"></canvas>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>PARC.</th><th>VALOR</th><th>DATA PC</th><th>TÉCNICO</th><th>ANALISTA</th><th>AÇÕES</th>
+                </tr>
+            </thead>
+            <tbody id="listaParcelas"></tbody>
+        </table>
+    </div>
 </div>
 
 <script>
-const SUPABASE_URL='https://tanbwsudetozpwkmmbxy.supabase.co';
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhbmJ3c3VkZXRvenB3a21tYnh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NjYyOTMsImV4cCI6MjA5MDU0MjI5M30.n6RKpFASm6PRTdXRWnp6S_D_o-Ivaou4ljq3O_Khyqk';
-const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+// --- CONFIGURAÇÃO SUPABASE ---
+const SUPABASE_URL = 'SUA_URL_AQUI';
+const SUPABASE_KEY = 'SUA_KEY_AQUI';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let projetoAtual=null;
-let parcelaEditId=null;
+let projetoAtual = null;
+let parcelaEditId = null;
+let meuGrafico = null;
 
-async function login(){
- await db.auth.signInWithPassword({email:email.value,password:senha.value});
- carregar();
+// --- AUTENTICAÇÃO ---
+async function login() {
+    const { error } = await db.auth.signInWithPassword({ email: email.value, password: senha.value });
+    if (error) alert("Erro: " + error.message);
+    else carregar();
 }
 
-async function logout(){
- await db.auth.signOut();
- location.reload();
+async function logout() {
+    await db.auth.signOut();
+    location.reload();
 }
 
-async function salvarProjeto(){
- await db.from('projetos').insert([{
- edital:edital.value,
- sei_exec:sei_exec.value,
- sei_pc:sei_pc.value,
- proposta:proposta.value,
- projeto:projeto.value,
- proponente:proponente.value,
- vig_ini:vig_ini.value,
- vig_fim:vig_fim.value,
- situacao:situacao.value,
- observacoes:obs.value
- }]);
- carregar();
+// --- CRUD PROJETOS ---
+async function salvarProjeto() {
+    const dados = {
+        edital: edital.value, sei_exec: sei_exec.value, sei_pc: sei_pc.value,
+        proposta: proposta.value, projeto: projeto.value, proponente: proponente.value,
+        vig_ini: vig_ini.value, vig_fim: vig_fim.value, situacao: situacao.value, observacoes: obs.value
+    };
+    const { error } = await db.from('projetos').insert([dados]);
+    if (error) alert("Erro ao salvar: " + error.message);
+    else carregar();
 }
 
-async function carregar(){
- const {data}=await db.from('projetos').select('*');
- tabela.innerHTML='';
- data.forEach(p=>{
- let tr=document.createElement('tr');
- tr.innerHTML=`
- <td>${p.id}</td>
- <td>${p.edital}</td>
- <td>${p.sei_exec}</td>
- <td>${p.sei_pc}</td>
- <td>${p.proposta}</td>
- <td>${p.projeto}</td>
- <td>${p.proponente}</td>
- <td>${p.vig_ini}</td>
- <td>${p.vig_fim}</td>
- <td>${p.situacao}</td>
- <td>${p.observacoes}</td>
- <td><button onclick="abrirParcelas(${p.id})">Parcelas</button></td>`;
- tabela.appendChild(tr);
- });
+async function carregar() {
+    const { data, error } = await db.from('projetos').select('*').order('id', { ascending: false });
+    if (error) return;
+    tabela.innerHTML = data.map(p => `
+        <tr>
+            <td>${p.id}</td>
+            <td><strong>${p.projeto}</strong></td>
+            <td>${p.proponente}</td>
+            <td>${p.vig_ini} até ${p.vig_fim}</td>
+            <td>${p.situacao}</td>
+            <td><button class="btn-main" onclick="abrirParcelas(${p.id})">Parcelas</button></td>
+        </tr>
+    `).join('');
 }
 
-function abrirParcelas(id){
- projetoAtual=id;
- modal.classList.add('show');
- carregarParcelas();
+// --- GESTÃO DE PARCELAS ---
+function abrirParcelas(id) {
+    projetoAtual = id;
+    modal.classList.add('show');
+    carregarParcelas();
 }
 
-function fecharModal(){modal.classList.remove('show');}
+function fecharModal() { modal.classList.remove('show'); parcelaEditId = null; }
 
-async function salvarParcela(){
- const {data}=await db.from('parcelas').select('*').eq('projeto_id',projetoAtual);
- let numero=data.length+1;
- if(parcelaEditId){
- await db.from('parcelas').update({valor:p_valor.value,data_pc:p_data.value,tecnico:p_tecnico.value,analista:p_analista.value}).eq('id',parcelaEditId);
- parcelaEditId=null;
- }else{
- await db.from('parcelas').insert([{projeto_id:projetoAtual,numero,valor:p_valor.value,data_pc:p_data.value,tecnico:p_tecnico.value,analista:p_analista.value}]);
- }
- limpar();
- carregarParcelas();
+async function carregarParcelas() {
+    const { data, error } = await db.from('parcelas').select('*').eq('projeto_id', projetoAtual).order('numero');
+    if (error) return;
+
+    let html = '';
+    let total = 0;
+    data.forEach(p => {
+        total += parseFloat(p.valor);
+        html += `
+            <tr>
+                <td>${p.numero}</td>
+                <td>R$ ${parseFloat(p.valor).toLocaleString('pt-BR')}</td>
+                <td>${new Date(p.data_pc).toLocaleDateString('pt-BR')}</td>
+                <td>${p.tecnico}</td>
+                <td>${p.analista}</td>
+                <td>
+                    <button onclick="editarParcela(${p.id},'${p.valor}','${p.data_pc}','${p.tecnico}','${p.analista}')">✏️</button>
+                    <button onclick="excluirParcela(${p.id})">🗑️</button>
+                </td>
+            </tr>`;
+    });
+    
+    html += `<tr style="background:#f1f5f9; font-weight:bold"><td colspan="1">TOTAL</td><td colspan="5">R$ ${total.toLocaleString('pt-BR')}</td></tr>`;
+    listaParcelas.innerHTML = html;
+    renderizarGrafico(data);
 }
 
-async function carregarParcelas(){
- const {data}=await db.from('parcelas').select('*').eq('projeto_id',projetoAtual).order('numero');
- listaParcelas.innerHTML='';
- data.forEach(p=>{
- let tr=document.createElement('tr');
- tr.innerHTML=`
- <td>${p.numero}</td>
- <td>${p.valor}</td>
- <td>${p.data_pc}</td>
- <td>${p.tecnico}</td>
- <td>${p.analista}</td>
- <td>
- <button onclick="editarParcela(${p.id},'${p.valor}','${p.data_pc}','${p.tecnico}','${p.analista}')">✏️</button>
- <button onclick="excluirParcela(${p.id})">🗑️</button>
- </td>`;
- listaParcelas.appendChild(tr);
- });
+async function salvarParcela() {
+    if (parcelaEditId) {
+        await db.from('parcelas').update({
+            valor: p_valor.value, data_pc: p_data.value, tecnico: p_tecnico.value, analista: p_analista.value
+        }).eq('id', parcelaEditId);
+        parcelaEditId = null;
+    } else {
+        const { data } = await db.from('parcelas').select('numero').eq('projeto_id', projetoAtual);
+        await db.from('parcelas').insert([{
+            projeto_id: projetoAtual, numero: data.length + 1,
+            valor: p_valor.value, data_pc: p_data.value, tecnico: p_tecnico.value, analista: p_analista.value
+        }]);
+    }
+    p_valor.value = ''; p_data.value = ''; p_tecnico.value = ''; p_analista.value = '';
+    carregarParcelas();
 }
 
-function editarParcela(id,v,d,t,a){
- parcelaEditId=id;
- p_valor.value=v;
- p_data.value=d;
- p_tecnico.value=t;
- p_analista.value=a;
+function editarParcela(id, v, d, t, a) {
+    parcelaEditId = id;
+    p_valor.value = v; p_data.value = d; p_tecnico.value = t; p_analista.value = a;
 }
 
-async function excluirParcela(id){
- await db.from('parcelas').delete().eq('id',id);
- carregarParcelas();
+async function excluirParcela(id) {
+    if(confirm("Deseja excluir esta parcela?")) {
+        await db.from('parcelas').delete().eq('id', id);
+        carregarParcelas();
+    }
 }
 
-function limpar(){
- p_valor.value='';p_data.value='';p_tecnico.value='';p_analista.value='';
-}
+// --- GRÁFICOS ---
+function renderizarGrafico(dados) {
+    const ctx = document.getElementById('graficoParcelas').getContext('2d');
+    if (meuGrafico) meuGrafico.destroy();
 
+    meuGrafico = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dados.map(p => `Parc ${p.numero}`),
+            datasets: [{
+                label: 'Fluxo Financeiro (R$)',
+                data: dados.map(p => p.valor),
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                borderColor: '#2563eb',
+                borderWidth: 3,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+}
 </script>
 
 </body>
